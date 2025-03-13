@@ -76,6 +76,7 @@ NfcApduScript* nfc_apdu_script_parse(Storage* storage, const char* file_path) {
     }
 
     memset(script, 0, sizeof(NfcApduScript));
+    script->extended_command = false; // 默认不使用扩展指令
 
     FuriString* temp_str = furi_string_alloc();
     if(!temp_str) {
@@ -166,9 +167,26 @@ NfcApduScript* nfc_apdu_script_parse(Storage* storage, const char* file_path) {
         }
         FURI_LOG_I("APDU_DEBUG", "卡类型解析成功: %s", card_type_str);
 
-        // 读取数据行
+        // 读取扩展指令行（可选）
         line = next_line + 1;
+        next_line = strchr(line, '\n');
 
+        // 检查当前行是否为 ExtendedCommand
+        if(next_line && strncmp(line, "ExtendedCommand: ", 17) == 0) {
+            *next_line = '\0';
+            const char* extended_cmd_str = line + 17; // 跳过 "ExtendedCommand: "
+            if(strcmp(extended_cmd_str, "true") == 0) {
+                script->extended_command = true;
+                FURI_LOG_I(
+                    "APDU_DEBUG", "启用扩展指令，最大长度为 %d 字节", MAX_EXTENDED_APDU_LENGTH);
+            }
+
+            // 读取下一行（应该是 Data 行）
+            line = next_line + 1;
+            next_line = strchr(line, '\n');
+        }
+
+        // 检查当前行是否为 Data 行
         if(strncmp(line, "Data: [", 7) != 0) {
             FURI_LOG_E("APDU_DEBUG", "无效的数据行: %s", line);
             break;
@@ -178,6 +196,16 @@ NfcApduScript* nfc_apdu_script_parse(Storage* storage, const char* file_path) {
 
         // 解析命令数组
         char* data_str = line + 7; // 跳过 "Data: ["
+
+        // 处理多行格式的命令
+        // 将整个文件内容中的所有换行符和空格替换为空字符，以便正确解析命令
+        char* p = data_str;
+        while(*p) {
+            if(*p == '\n' || *p == '\r') {
+                *p = ' '; // 将换行符替换为空格
+            }
+            p++;
+        }
 
         // 查找第一个引号
         char* command_start = strchr(data_str, '"');
@@ -226,6 +254,21 @@ NfcApduScript* nfc_apdu_script_parse(Storage* storage, const char* file_path) {
             if(command_len % 2 != 0) {
                 FURI_LOG_E(
                     "APDU_DEBUG", "命令长度必须是偶数: %.*s", (int)command_len, command_start);
+                command_start = strchr(command_end + 1, '"');
+                continue;
+            }
+
+            // 检查命令长度是否超过限制
+            size_t max_cmd_len = script->extended_command ? MAX_EXTENDED_APDU_LENGTH * 2 :
+                                                            MAX_APDU_LENGTH * 2;
+            if(command_len > max_cmd_len) {
+                FURI_LOG_E(
+                    "APDU_DEBUG",
+                    "命令长度超过限制(%zu > %zu): %.*s",
+                    command_len,
+                    max_cmd_len,
+                    (int)command_len,
+                    command_start);
                 command_start = strchr(command_end + 1, '"');
                 continue;
             }

@@ -3,7 +3,7 @@
  * @Date: 2025-02-28 18:02:04
  * @version: 
  * @LastEditors: SpenserCai
- * @LastEditTime: 2025-03-08 00:24:26
+ * @LastEditTime: 2025-03-13 11:21:19
  * @Description: file content
  */
 #pragma once
@@ -32,13 +32,14 @@
 #include <toolbox/hex.h>
 #include <toolbox/path.h>
 
-#define APP_DIRECTORY_PATH "/ext/apps_data/nfc_apdu_runner"
-#define FILE_EXTENSION     ".apduscr"
-#define RESPONSE_EXTENSION ".apdures"
-#define MAX_APDU_COMMANDS  50
-#define MAX_APDU_LENGTH    256
-#define MAX_LOG_ENTRIES    100
-#define MAX_FILENAME_LEN   64
+#define APP_DIRECTORY_PATH       "/ext/apps_data/nfc_apdu_runner"
+#define FILE_EXTENSION           ".apduscr"
+#define RESPONSE_EXTENSION       ".apdures"
+#define MAX_APDU_COMMANDS        50
+#define MAX_APDU_LENGTH          256
+#define MAX_EXTENDED_APDU_LENGTH 1024
+#define MAX_LOG_ENTRIES          100
+#define MAX_FILENAME_LEN         64
 
 // 自定义事件枚举
 typedef enum {
@@ -75,6 +76,7 @@ typedef struct {
     CardType card_type;
     char* commands[MAX_APDU_COMMANDS];
     uint32_t command_count;
+    bool extended_command; // 是否使用扩展指令，true表示支持最高512字节
 } NfcApduScript;
 
 // APDU响应结构

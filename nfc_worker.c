@@ -233,8 +233,14 @@ static int32_t nfc_worker_apdu_thread(void* context) {
     // 创建APDU上下文
     ApduContext apdu_ctx;
     memset(&apdu_ctx, 0, sizeof(ApduContext));
-    apdu_ctx.tx_buffer = bit_buffer_alloc(MAX_APDU_LENGTH * 8);
-    apdu_ctx.rx_buffer = bit_buffer_alloc(MAX_APDU_LENGTH * 8);
+
+    // 根据是否启用扩展指令，分配不同大小的缓冲区
+    uint32_t buffer_size = worker->script && worker->script->extended_command ?
+                               MAX_EXTENDED_APDU_LENGTH * 8 :
+                               MAX_APDU_LENGTH * 8;
+
+    apdu_ctx.tx_buffer = bit_buffer_alloc(buffer_size);
+    apdu_ctx.rx_buffer = bit_buffer_alloc(buffer_size);
     apdu_ctx.ready = false;
     apdu_ctx.is_last = false;
     apdu_ctx.thread_id = furi_thread_get_current_id();
@@ -280,7 +286,15 @@ static int32_t nfc_worker_apdu_thread(void* context) {
         FURI_LOG_I(TAG, "准备执行APDU命令 %lu: %s", i, cmd);
 
         // 解析APDU命令
-        uint8_t apdu_data[MAX_APDU_LENGTH];
+        uint32_t max_apdu_len = worker->script->extended_command ? MAX_EXTENDED_APDU_LENGTH :
+                                                                   MAX_APDU_LENGTH;
+        uint8_t* apdu_data = malloc(max_apdu_len);
+        if(!apdu_data) {
+            FURI_LOG_E(TAG, "分配APDU数据内存失败");
+            is_error = true;
+            break;
+        }
+
         uint16_t apdu_len = 0;
         size_t cmd_len = strlen(cmd);
 
@@ -291,7 +305,7 @@ static int32_t nfc_worker_apdu_thread(void* context) {
             char hex[3] = {cmd[j], cmd[j + 1], '\0'};
             apdu_data[apdu_len++] = (uint8_t)strtol(hex, NULL, 16);
 
-            if(apdu_len >= MAX_APDU_LENGTH) break;
+            if(apdu_len >= max_apdu_len) break;
         }
 
         // 清空缓冲区
@@ -300,6 +314,9 @@ static int32_t nfc_worker_apdu_thread(void* context) {
 
         // 将APDU数据复制到发送缓冲区
         bit_buffer_copy_bytes(apdu_ctx.tx_buffer, apdu_data, apdu_len);
+
+        // 释放临时APDU数据内存
+        free(apdu_data);
 
         // 保存命令
         worker->responses[response_count].command = strdup(cmd);
