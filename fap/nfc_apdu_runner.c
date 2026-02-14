@@ -47,13 +47,13 @@ void nfc_apdu_responses_free(NfcApduResponse* responses, uint32_t count) {
 
 // 解析卡类型字符串
 static CardType parse_card_type(const char* type_str) {
-    if(strcmp(type_str, "iso14443_3a") == 0) {
+    if(strncmp(type_str, "iso14443_3a", 11) == 0) {
         return CardTypeIso14443_3a;
-    } else if(strcmp(type_str, "iso14443_3b") == 0) {
+    } else if(strncmp(type_str, "iso14443_3b", 11) == 0) {
         return CardTypeIso14443_3b;
-    } else if(strcmp(type_str, "iso14443_4a") == 0) {
+    } else if(strncmp(type_str, "iso14443_4a", 11) == 0) {
         return CardTypeIso14443_4a;
-    } else if(strcmp(type_str, "iso14443_4b") == 0) {
+    } else if(strncmp(type_str, "iso14443_4b", 11) == 0) {
         return CardTypeIso14443_4b;
     } else {
         return CardTypeUnknown;
